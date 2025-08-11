@@ -1,0 +1,170 @@
+static class SavePanelResponseByPanelHash_Regex  {
+        static var SAVE_DIR = "D:\\CapcutMock\\new\\heycan-api-myb.capcutapi.com\\artist\\v1\\panel\\get_panel_info\\";
+
+        static function Save(oSession: Session) {
+            FiddlerApplication.Log.LogString("[DEBUG] URL matched: " + oSession.fullUrl);
+
+            if (!oSession.fullUrl.Contains("/artist/v1/panel/get_panel_info")) return;
+
+            try {
+                oSession.utilDecodeResponse();
+                var responseBody = oSession.GetResponseBodyAsString();
+                var panel = ExtractPanelKey(oSession.GetRequestBodyAsString());
+                
+                var hash = GetShortHash(panel);
+                var fileName = panel + "_" + hash + ".json";
+                var path = SAVE_DIR + fileName;
+
+                System.IO.Directory.CreateDirectory(SAVE_DIR);
+                System.IO.File.WriteAllText(path, responseBody);
+
+                FiddlerApplication.Log.LogString("💾 Panel response saved (regex): " + path);
+            } catch (ex) {
+                FiddlerApplication.Log.LogString("❌ Error saving panel response: " + ex);
+            }
+        }
+            
+        static function ExtractPanelKey(json: String): String {
+            var regex = new System.Text.RegularExpressions.Regex("\"panel\"\\s*:\\s*\"([^\"]+)\"");
+            var match = regex.Match(json);
+            if (match.Success) {
+                return match.Groups[1].Value;
+            }
+            return "unknown";
+        }
+
+        static function GetShortHash(text: String): String {
+            var crypto = new System.Security.Cryptography.MD5CryptoServiceProvider();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+            var hashBytes = crypto.ComputeHash(bytes);
+            return BitConverter.ToString(hashBytes).Replace("-", "").Substring(0, 8).ToLower();
+        }
+    }
+
+    static class SaveEffectResponseByParams_Regex {
+        static var SAVE_DIR = "D:\\CapcutMock\\new\\heycan-api-myb.capcutapi.com\\artist\\v1\\effect\\get_resources_by_category_id\\";
+
+        static function Save(oSession: Session) {
+            FiddlerApplication.Log.LogString("[DEBUG] URL matched: " + oSession.fullUrl);
+
+            if (!oSession.fullUrl.Contains("/artist/v1/effect/get_resources_by_category_id")) return;
+
+            try {
+                oSession.utilDecodeResponse();
+                var responseBody = oSession.GetResponseBodyAsString();
+                var json = oSession.GetRequestBodyAsString();
+                
+                var catId = GetJsonField(json, "category_id");
+                var catKey = GetJsonField(json, "category_key");
+                var panel = GetJsonField(json, "panel");
+                var panelSource = GetJsonField(json, "panel_source");
+                var count = GetJsonField(json, "count");
+                var offset = GetJsonField(json, "offset");
+                var fileName;
+                if (!catKey == "") {
+                    fileName = panel + "_" + catKey + "_" + offset + ".json";
+                } else {
+                    fileName = panel + "_" + catId + ".json";
+                }
+                var path = SAVE_DIR + fileName;
+
+                System.IO.Directory.CreateDirectory(SAVE_DIR);
+                System.IO.File.WriteAllText(path, responseBody);
+
+                FiddlerApplication.Log.LogString("💾 Effect response saved (regex): " + path);
+            } catch (ex) {
+                FiddlerApplication.Log.LogString("❌ Error saving effect response: " + ex);
+            }
+        }
+
+        static function ExtractParamKey(json: String): String {
+            // Ambil parameter penting (gunakan fallback jika tidak ada)
+            var catId = GetJsonField(json, "category_id");
+            var catKey = GetJsonField(json, "category_key");
+            var panel = GetJsonField(json, "panel");
+            var panelSource = GetJsonField(json, "panel_source");
+            var count = GetJsonField(json, "count");
+            var offset = GetJsonField(json, "offset");
+
+            // Gabungkan sebagai string kunci
+            var keyString = "category_id=" + catId + 
+                "|category_key=" + catKey + 
+                "|panel=" + panel + 
+                "|panel_source=" + panelSource + 
+                "|count=" + count + 
+                "|offset=" + offset;
+            return keyString;
+        }
+
+        static function GetJsonField(json: String, fieldName: String): String {
+            var pattern = "\"" + fieldName + "\"\\s*:\\s*(\"([^\"]*)\"|null|\\d+)";
+            var regex = new System.Text.RegularExpressions.Regex(pattern);
+            var match = regex.Match(json);
+            if (match.Success) {
+                var rawValue = match.Groups[1].Value;
+                if (rawValue == "null") return "null";
+                if (rawValue.StartsWith("\"") && rawValue.EndsWith("\"")) {
+                    return rawValue.Substring(1, rawValue.Length - 2);
+                }
+                return rawValue; // angka
+            }
+            return "undefined";
+        }
+
+        static function GetShortHash(text: String): String {
+            var crypto = new System.Security.Cryptography.MD5CryptoServiceProvider();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+            var hashBytes = crypto.ComputeHash(bytes);
+            return BitConverter.ToString(hashBytes).Replace("-", "").Substring(0, 8).ToLower();
+        }
+    }
+
+    static class SaveCapcutApiResponse {
+        static var BASE_DIR = "D:\\CapcutMock\\new\\";
+
+        static function Save(oSession: Session) {
+            if (!oSession.hostname.EndsWith(".capcutapi.com")) return;
+            if (!oSession.hostname.Contains("feed-api")) return;
+
+            try {
+                // Decode body & response
+                oSession.utilDecodeRequest();
+                oSession.utilDecodeResponse();
+
+                var method = oSession.RequestMethod.ToUpper();
+                var host = oSession.hostname;
+                var pathOnly = oSession.PathAndQuery.Split('?')[0]; // remove query string
+                var body = oSession.GetRequestBodyAsString();
+
+                var hash = (method == "POST") ? "_" + GetShortHash(body) : "";
+                var safePath = pathOnly.Replace("/", "\\").Trim("\\");
+
+                var dirPath = BASE_DIR + host + "\\" + safePath;
+                System.IO.Directory.CreateDirectory(dirPath);
+
+                var filename = method.toLowerCase() + hash + ".json";
+                var fullPath = dirPath + "\\" + filename;
+
+                System.IO.File.WriteAllBytes(fullPath, oSession.responseBodyBytes);
+                FiddlerApplication.Log.LogString("💾 Saved: " + fullPath);
+            } catch (ex) {
+                FiddlerApplication.Log.LogString("❌ Save failed: " + ex);
+            }
+        }
+
+        static function GetShortHash(text: String): String {
+            var crypto = new System.Security.Cryptography.MD5CryptoServiceProvider();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+            var hashBytes = crypto.ComputeHash(bytes);
+            return BitConverter.ToString(hashBytes).Replace("-", "").Substring(0, 8).ToLower();
+        }
+    }
+    
+    static function OnBeforeResponse(oSession: Session) {
+        SaveCapcutApiResponse.Save(oSession);
+        SavePanelResponseByPanelHash_Regex.Save(oSession);
+        SaveEffectResponseByParams_Regex.Save(oSession);
+        if (m_Hide304s && oSession.responseCode == 304) {
+            oSession["ui-hide"] = "true";
+        }
+    }

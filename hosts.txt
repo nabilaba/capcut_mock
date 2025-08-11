@@ -1,0 +1,5 @@
+127.0.0.1 feed-api-myb.capcutapi.com
+127.0.0.1 feed-api-sg.capcutapi.com
+127.0.0.1 feed-api.capcutapi.com
+127.0.0.1 heycan-api-myb.capcutapi.com
+127.0.0.1 editor-api.capcutapi.com
